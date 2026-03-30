@@ -17,8 +17,7 @@ Welcome to **Redline IQ**, the ultimate tool for cyclists and runners who want t
 
 * **Real-time Tracking:** Distance remaining, ETA, and progress metrics right on your cycling computer.
 * **Non-Intrusive:** Built as a Garmin Data Field, meaning you don't lose your favorite map view or training data screens.
-* **Blazing Fast Backend:** Powered by a modern Rust (Axum) API.
-* **One-Click Deploy:** Ready to host effortlessly on [Railway.app](https://railway.app/).
+* **One-Click Run:** Available as a pre-built Docker image hosted on the GitHub Container Registry. Just `docker run` and start syncing!
 
 ## 🚀 Get Started
 

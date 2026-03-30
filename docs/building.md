@@ -12,11 +12,13 @@ docker-compose up backend
 ```
 You can access the frontend portal at `http://localhost:8080` to upload a GPX file.
 
-### Railway Deployment (GitHub Actions)
-We have configured a `.github/workflows/deploy.yml` pipeline. To deploy to Railway:
-1. Push this repository to GitHub.
-2. Link your GitHub repo to a new Project in [Railway.app](https://railway.app/).
-3. Alternatively, supply your `RAILWAY_TOKEN` as a GitHub repository secret, and the action will deploy it automatically on every push!
+### GHCR Auto-Deployment (GitHub Actions)
+We have configured a `.github/workflows/docker-publish.yml` pipeline.
+1. When you push to the `main` branch, GitHub Actions builds the Docker image and publishes it to the GitHub Container Registry (`ghcr.io/NikolaasBender/redline-iq-backend:latest`).
+2. To run the deployed image on any server:
+   ```bash
+   docker run -d -p 8080:8080 ghcr.io/NikolaasBender/redline-iq-backend:latest
+   ```
 
 ## 2. Compiling the Garmin App
 

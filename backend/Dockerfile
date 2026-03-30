@@ -1,12 +1,12 @@
 FROM rust:latest as builder
 WORKDIR /usr/src/app
-
-# Install dependencies if needed
-# RUN apt-get update && apt-get install -y libpq-dev
-
-# Copy over the source
 COPY . .
+RUN cargo build --release
 
-# Expose port and run
+FROM debian:bookworm-slim
+WORKDIR /app
+COPY --from=builder /usr/src/app/target/release/backend /usr/local/bin/backend
+COPY public /app/public
+
 EXPOSE 8080
-CMD ["cargo", "run", "--release"]
+CMD ["backend"]

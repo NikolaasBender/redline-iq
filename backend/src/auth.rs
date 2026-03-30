@@ -3,8 +3,9 @@ use axum::{
     Router, Json, response::Redirect
 };
 use serde_json::Value;
+use crate::AppState;
 
-pub fn auth_router() -> Router {
+pub fn auth_router() -> Router<AppState> {
     Router::new()
         .route("/signup", post(signup))
         .route("/login", post(login))

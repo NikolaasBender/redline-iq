@@ -1,0 +1,35 @@
+name: Rust Lint, Format, and Test
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "backend"
+
+      - name: Format Check
+        run: cargo fmt --manifest-path backend/Cargo.toml -- --check
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path backend/Cargo.toml -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --manifest-path backend/Cargo.toml

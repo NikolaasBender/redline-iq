@@ -1,0 +1,5 @@
+garmin_app/developer_key.der
+garmin_app/developer_key.pem
+garmin_app/bin/
+backend/target/
+backend/**/*.db

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Garmin Custom Live Segments Sync</title>
+    <style>
+        body { font-family: Inter, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; max-width: 800px; margin: 0 auto; }
+        h1 { color: #38bdf8; }
+        .card { background: #1e293b; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        button { background: #0ea5e9; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #0284c7; }
+        input[type="file"] { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <h1>Sync Segments to Garmin</h1>
+    <div class="card">
+        <h2>Upload GPX with Notes</h2>
+        <p>1. Plot your route in RideWithGPS and add Notes acting as [Segment Start] and [Segment End].</p>
+        <p>2. Export as GPX and upload here.</p>
+        <input type="file" id="gpxUpload" accept=".gpx">
+        <br>
+        <button onclick="uploadGpx()">Sync to Cloud</button>
+        <div id="status" style="margin-top: 1rem; color: #10b981;"></div>
+    </div>
+    
+    <div class="card" style="margin-top: 2rem;">
+        <h2>Connect IQ Setup</h2>
+        <p>Your unique Garmin Sync Token: <strong style="color: #fbbf24;">MOCK-TOKEN-XYZ</strong></p>
+        <p>Enter this token in your Connect IQ Data Field settings on your Garmin Connect app.</p>
+    </div>
+
+    <script>
+        async function uploadGpx() {
+            const file = document.getElementById('gpxUpload').files[0];
+            if (!file) return alert('Please select a file');
+            
+            const text = await file.text();
+            document.getElementById('status').innerText = 'Uploading...';
+            
+            try {
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: text
+                });
+                const data = await res.json();
+                document.getElementById('status').innerText = `Success! Parsed ${data.parsed_segments.length} segments. Next time you start your Garmin Edge activity, the segments will auto-sync!`;
+            } catch (e) {
+                document.getElementById('status').innerText = 'Error uploading GPX';
+                document.getElementById('status').style.color = '#ef4444';
+            }
+        }
+    </script>
+</body>
+</html>

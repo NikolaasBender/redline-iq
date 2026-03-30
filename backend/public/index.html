@@ -14,23 +14,57 @@
 </head>
 <body>
     <h1>Sync Segments to Garmin</h1>
-    <div class="card">
-        <h2>Upload GPX with Notes</h2>
-        <p>1. Plot your route in RideWithGPS and add Notes acting as [Segment Start] and [Segment End].</p>
-        <p>2. Export as GPX and upload here.</p>
-        <input type="file" id="gpxUpload" accept=".gpx">
-        <br>
-        <button onclick="uploadGpx()">Sync to Cloud</button>
-        <div id="status" style="margin-top: 1rem; color: #10b981;"></div>
-    </div>
     
-    <div class="card" style="margin-top: 2rem;">
-        <h2>Connect IQ Setup</h2>
-        <p>Your unique Garmin Sync Token: <strong style="color: #fbbf24;">MOCK-TOKEN-XYZ</strong></p>
-        <p>Enter this token in your Connect IQ Data Field settings on your Garmin Connect app.</p>
+    <div class="card" id="authSection" style="margin-bottom: 2rem;">
+        <h2>Account</h2>
+        <p>Log in to sync your device and save active segments to your profile.</p>
+        <button onclick="loginWithGoogle()" style="background: #ea4335;">Sign in with Google</button>
+        <button onclick="mockLogin()" style="background: #10b981; margin-left: 0.5rem;">Guest Log In (Demo)</button>
+        <div id="authStatus" style="margin-top: 1rem; color: #94a3b8;">Not logged in.</div>
+    </div>
+
+    <div id="appSections" style="opacity: 0.4; pointer-events: none;">
+        <div class="card">
+            <h2>Upload GPX with Notes</h2>
+            <p>1. Plot your route in RideWithGPS and add Notes acting as [Segment Start] and [Segment End].</p>
+            <p>2. Export as GPX and upload here.</p>
+            <input type="file" id="gpxUpload" accept=".gpx">
+            <br>
+            <button onclick="uploadGpx()">Sync to Cloud</button>
+            <div id="status" style="margin-top: 1rem; color: #10b981;"></div>
+        </div>
+        
+        <div class="card" style="margin-top: 2rem;">
+            <h2>Connect IQ Setup</h2>
+            <p>Your unique Garmin Sync Token: <strong id="tokenBox" style="color: #fbbf24;">(Log in to see token)</strong></p>
+            <p>Enter this token in your Connect IQ Data Field settings on your Garmin Connect app.</p>
+        </div>
     </div>
 
     <script>
+        function loginWithGoogle() {
+            // Redirects to the Rust backend OAuth route
+            window.location.href = '/auth/google';
+        }
+
+        async function mockLogin() {
+            try {
+                const res = await fetch('/login', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    document.getElementById('authStatus').innerText = 'Logged in successfully!';
+                    document.getElementById('authStatus').style.color = '#10b981';
+                    document.getElementById('tokenBox').innerText = data.token;
+                    
+                    // Unlock the UI
+                    document.getElementById('appSections').style.opacity = '1.0';
+                    document.getElementById('appSections').style.pointerEvents = 'auto';
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
         async function uploadGpx() {
             const file = document.getElementById('gpxUpload').files[0];
             if (!file) return alert('Please select a file');

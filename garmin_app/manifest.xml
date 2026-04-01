@@ -14,6 +14,5 @@
         <iq:languages>
             <iq:language>eng</iq:language>
         </iq:languages>
-        <iq:trialMode days="0"/>
     </iq:application>
 </iq:manifest>

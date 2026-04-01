@@ -21,7 +21,7 @@ Welcome to **Redline IQ**, the ultimate tool for cyclists and runners who want t
 
 ## 🚀 Get Started
 
-Ready to level up your training? 
+Ready to level up your training?
 
 - 🛠️ [Documentation on Building and Deploying](./docs/building.md)
 - 📊 [Architecture Overview](./docs/architecture.md)

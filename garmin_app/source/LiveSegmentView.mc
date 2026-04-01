@@ -30,16 +30,23 @@ class LiveSegmentView extends WatchUi.DataField {
     // Display the value you computed here. This will be called
     // once a second when the data field is visible.
     function onUpdate(dc as Dc) as Void {
-        // Set the background color
-        View.findDrawableById("Background").setColor(getBackgroundColor());
-
-        // Call parent's onUpdate(dc) to redraw the layout
-        View.onUpdate(dc);
-
-        var valueDrawable = View.findDrawableById("value");
-        if (valueDrawable != null) {
-            valueDrawable.setText(mValue.format("%.2f"));
-        }
+        // Clear background
+        dc.setColor(Graphics.COLOR_TRANSPARENT, getBackgroundColor());
+        dc.clear();
+        
+        // Set text color contrasting the background
+        var textColor = (getBackgroundColor() == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+        dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
+        
+        // Draw the value
+        var text = mValue.format("%.2f");
+        dc.drawText(
+            dc.getWidth() / 2, 
+            dc.getHeight() / 2, 
+            Graphics.FONT_LARGE, 
+            text, 
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER
+        );
     }
 
 }

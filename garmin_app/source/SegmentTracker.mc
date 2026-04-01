@@ -1,3 +1,4 @@
+import Toybox.Lang;
 import Toybox.Position;
 import Toybox.System;
 import Toybox.Math;

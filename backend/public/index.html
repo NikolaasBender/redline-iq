@@ -2,88 +2,421 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Garmin Custom Live Segments Sync</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redline IQ | Course Visualizer</title>
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <style>
-        body { font-family: Inter, sans-serif; background: #0f172a; color: #f8fafc; padding: 2rem; max-width: 800px; margin: 0 auto; }
-        h1 { color: #38bdf8; }
-        .card { background: #1e293b; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-        button { background: #0ea5e9; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0284c7; }
-        input[type="file"] { margin-bottom: 1rem; }
+        :root {
+            --bg-deep: #020617;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent-cyan: #22d3ee;
+            --accent-orange: #fb923c;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-deep);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(34, 211, 238, 0.1) 0, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(251, 146, 60, 0.1) 0, transparent 50%);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar Layout */
+        #sidebar {
+            width: 400px;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--glass-border);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: -0.05em;
+            margin: 0;
+            font-size: 1.5rem;
+            color: var(--accent-cyan);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        h1 span { color: var(--text-primary); }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1rem;
+            margin-top: 0;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Inputs & Buttons */
+        input[type="text"] {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--glass-border);
+            padding: 0.75rem;
+            border-radius: 8px;
+            color: white;
+            font-family: inherit;
+            margin-bottom: 1rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, var(--accent-cyan), #0ea5e9);
+            color: #020617;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 0 20px rgba(34, 211, 238, 0.4);
+        }
+
+        button.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Route List Styling */
+        #routeList {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .route-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            padding: 0.75rem;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .route-item:hover {
+            background: rgba(34, 211, 238, 0.1);
+            border-color: var(--accent-cyan);
+        }
+
+        .route-item.active-entry {
+            border-left: 4px solid var(--accent-cyan);
+        }
+
+        .route-item span {
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        /* Map Area */
+        #main-view {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #020617;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(2, 6, 23, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(34, 211, 238, 0.1);
+            border-top: 5px solid var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Custom Map Styles */
+        .leaflet-container { background: #020617 !important; }
+        .leaflet-bar a { background: #1e293b !important; color: white !important; border-color: rgba(255, 255, 255, 0.1) !important; }
     </style>
 </head>
 <body>
-    <h1>Sync Segments to Garmin</h1>
-    
-    <div class="card" id="authSection" style="margin-bottom: 2rem;">
-        <h2>Account</h2>
-        <p>Log in to sync your device and save active segments to your profile.</p>
-        <button onclick="loginWithGoogle()" style="background: #ea4335;">Sign in with Google</button>
-        <button onclick="mockLogin()" style="background: #10b981; margin-left: 0.5rem;">Guest Log In (Demo)</button>
-        <div id="authStatus" style="margin-top: 1rem; color: #94a3b8;">Not logged in.</div>
+    <div id="loading">
+        <div class="spinner"></div>
+        <div style="font-family: 'Outfit'; font-weight: bold; color: var(--accent-cyan);">SYNCING DATA...</div>
     </div>
 
-    <div id="appSections" style="opacity: 0.4; pointer-events: none;">
-        <div class="card">
-            <h2>Upload GPX with Notes</h2>
-            <p>1. Plot your route in RideWithGPS and add Notes acting as [Segment Start] and [Segment End].</p>
-            <p>2. Export as GPX and upload here.</p>
-            <input type="file" id="gpxUpload" accept=".gpx">
-            <br>
-            <button onclick="uploadGpx()">Sync to Cloud</button>
-            <div id="status" style="margin-top: 1rem; color: #10b981;"></div>
-        </div>
+    <aside id="sidebar">
+        <h1>REDLINE<span>IQ</span></h1>
         
-        <div class="card" style="margin-top: 2rem;">
-            <h2>Connect IQ Setup</h2>
-            <p>Your unique Garmin Sync Token: <strong id="tokenBox" style="color: #fbbf24;">(Log in to see token)</strong></p>
-            <p>Enter this token in your Connect IQ Data Field settings on your Garmin Connect app.</p>
+        <!-- Auth -->
+        <div class="card" id="authBox">
+            <h2>Account</h2>
+            <div id="authContent">
+                <button onclick="loginWithGoogle()">Sign in with Google</button>
+                <div style="margin: 0.75rem 0; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">OR</div>
+                <button class="secondary" onclick="mockLogin()">Guest Log In</button>
+            </div>
+            <div id="userInfo" style="display: none; font-size: 0.875rem;">
+                <div id="userLabel" style="font-weight: bold; color: var(--accent-cyan); margin-bottom: 0.5rem;">Logged In</div>
+                <div style="color: var(--text-secondary); font-size: 0.75rem;">Sync Token: <span id="tokenDisplay" style="color: var(--accent-orange); font-family: monospace;"></span></div>
+            </div>
         </div>
-    </div>
 
+        <div id="mainDashboard" style="display: none; flex-direction: column; gap: 1.5rem;">
+            <!-- Import -->
+            <div class="card">
+                <h2>Import Route</h2>
+                <input type="text" id="routeSource" placeholder="RideWithGPS URL">
+                <button onclick="importRoute()">Import Telemetry</button>
+                <div id="importStatus" style="font-size: 0.75rem; margin-top: 0.5rem;"></div>
+            </div>
+
+            <!-- Library -->
+            <div class="card" style="flex-grow: 1;">
+                <h2>My Routes</h2>
+                <div id="routeList">
+                    <p style="color: var(--text-secondary); font-size: 0.875rem;">Loading routes...</p>
+                </div>
+            </div>
+
+            <!-- Segment Info Overlay (Conditional) -->
+            <div class="card" id="segmentStats" style="display: none;">
+                <h2 id="vizRouteName">Route Details</h2>
+                <div style="font-size: 0.875rem;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                        <span style="color: var(--text-secondary);">Segments Found:</span>
+                        <span id="segmentCount" style="color: var(--accent-orange); font-weight: bold;">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main id="main-view">
+        <div id="map"></div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script>
-        function loginWithGoogle() {
-            // Redirects to the Rust backend OAuth route
-            window.location.href = '/auth/google';
+        let authToken = localStorage.getItem('redline_token') || '';
+        let map, routeLine, segmentLayers = [];
+
+        // Initialize Map
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: true,
+                attributionControl: false
+            }).setView([40, -100], 4);
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
         }
 
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'flex' : 'none';
+        }
+
+        // Logic
+        async function checkSession() {
+            if (authToken) {
+                onLoginSuccess(authToken);
+            }
+        }
+
+        function loginWithGoogle() { window.location.href = '/auth/google'; }
+
         async function mockLogin() {
+            showLoading(true);
             try {
                 const res = await fetch('/login', { method: 'POST' });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    document.getElementById('authStatus').innerText = 'Logged in successfully!';
-                    document.getElementById('authStatus').style.color = '#10b981';
-                    document.getElementById('tokenBox').innerText = data.token;
-                    
-                    // Unlock the UI
-                    document.getElementById('appSections').style.opacity = '1.0';
-                    document.getElementById('appSections').style.pointerEvents = 'auto';
+                    authToken = data.token;
+                    localStorage.setItem('redline_token', authToken);
+                    onLoginSuccess(authToken);
                 }
-            } catch (e) {
-                console.error(e);
-            }
+            } catch (e) { console.error(e); }
+            showLoading(false);
         }
 
-        async function uploadGpx() {
-            const file = document.getElementById('gpxUpload').files[0];
-            if (!file) return alert('Please select a file');
+        function onLoginSuccess(token) {
+            document.getElementById('authContent').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'block';
+            document.getElementById('tokenDisplay').innerText = token.substring(0, 8) + '...';
+            document.getElementById('mainDashboard').style.display = 'flex';
+            refreshRoutes();
+        }
+
+        async function importRoute() {
+            const url = document.getElementById('routeSource').value;
+            if (!url) return;
             
-            const text = await file.text();
-            document.getElementById('status').innerText = 'Uploading...';
-            
+            showLoading(true);
             try {
-                const res = await fetch('/api/upload', {
+                const res = await fetch('/api/routes/import', {
                     method: 'POST',
-                    body: text
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ url })
                 });
                 const data = await res.json();
-                document.getElementById('status').innerText = `Success! Parsed ${data.parsed_segments.length} segments. Next time you start your Garmin Edge activity, the segments will auto-sync!`;
-            } catch (e) {
-                document.getElementById('status').innerText = 'Error uploading GPX';
-                document.getElementById('status').style.color = '#ef4444';
-            }
+                if (data.status === 'success') {
+                    document.getElementById('routeSource').value = '';
+                    await refreshRoutes();
+                    visualizeRoute(data.route_id);
+                } else {
+                    alert(data.message);
+                }
+            } catch (e) { console.error(e); }
+            showLoading(false);
         }
+
+        async function refreshRoutes() {
+            try {
+                const res = await fetch('/api/routes', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                const list = document.getElementById('routeList');
+                list.innerHTML = '';
+                
+                if (data.routes.length === 0) {
+                    list.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.875rem;">No routes yet.</p>';
+                    return;
+                }
+
+                data.routes.forEach(route => {
+                    const div = document.createElement('div');
+                    div.className = 'route-item';
+                    div.onclick = () => visualizeRoute(route.id);
+                    div.innerHTML = `
+                        <span>${route.name}</span>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="event.stopPropagation(); setActive('${route.id}')" style="padding: 0.25rem 0.5rem; font-size: 0.6rem; width: auto;">ACTIVATE</button>
+                        </div>
+                    `;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        async function visualizeRoute(id) {
+            showLoading(true);
+            try {
+                const res = await fetch(`/api/routes/${id}/viz`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                console.log('Viz response:', data);
+                if (data.status === 'success') {
+                    // Clear old layers
+                    if (routeLine) map.removeLayer(routeLine);
+                    segmentLayers.forEach(l => map.removeLayer(l));
+                    segmentLayers = [];
+
+                    // Render Full Polyline
+                    routeLine = L.polyline(data.full_polyline, {
+                        color: 'rgba(34, 211, 238, 0.4)',
+                        weight: 4,
+                        lineCap: 'round'
+                    }).addTo(map);
+
+                    // Render Segments
+                    data.segments.forEach(seg => {
+                        const sLine = L.polyline(seg.polyline, {
+                            color: '#fb923c',
+                            weight: 6,
+                            opacity: 1.0,
+                            shadowBlur: 10,
+                            shadowColor: '#fb923c'
+                        }).addTo(map);
+                        sLine.bindPopup(`<strong>${seg.name}</strong><br>${(seg.distance_m/1000).toFixed(1)}km | ${seg.elevation_gain_m.toFixed(0)}m gain`);
+                        segmentLayers.push(sLine);
+                    });
+
+                    // Update UI stats
+                    document.getElementById('segmentStats').style.display = 'block';
+                    document.getElementById('vizRouteName').innerText = data.name;
+                    document.getElementById('segmentCount').innerText = data.segments.length;
+
+                    // Zoom
+                    map.fitBounds(routeLine.getBounds(), { padding: [50, 50] });
+                }
+            } catch (e) { console.error(e); }
+            showLoading(false);
+        }
+
+        async function setActive(id) {
+            try {
+                const res = await fetch('/api/routes/active', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                    body: JSON.stringify({ route_id: id })
+                });
+                const data = await res.json();
+                if (data.status === 'success') alert('System calibrated. Route active for sync.');
+            } catch (e) { console.error(e); }
+        }
+
+        // Boot
+        initMap();
+        checkSession();
     </script>
 </body>
 </html>

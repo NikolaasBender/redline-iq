@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REDLINE IQ | Course Visualizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <style>
+        :root {
+            --f1-red: #e10600;
+            --bg-dark: #0f1117;
+            --card-bg: #1a1d26;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --sector-1: #a855f7; /* Purple */
+            --sector-2: #eab308; /* Yellow */
+            --sector-3: #22c55e; /* Green */
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: 'Titillium Web', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            overflow: hidden;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-areas: 
+                "header header"
+                "map side"
+                "footer footer";
+            grid-template-columns: 1fr 400px;
+            grid-template-rows: 60px 1fr 60px;
+            height: 100vh;
+        }
+
+        /* Header */
+        header {
+            grid-area: header;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            border-bottom: 2px solid var(--f1-red);
+            z-index: 1000;
+        }
+
+        .brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: 2px;
+            color: var(--text-main);
+        }
+
+        .brand span { color: var(--f1-red); }
+
+        .auth-bar {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .token-input {
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-family: monospace;
+            width: 250px;
+        }
+
+        /* Map */
+        #map {
+            grid-area: map;
+            background: #111;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            grid-area: side;
+            background: var(--card-bg);
+            border-left: 1px solid #2d313d;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid #2d313d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .route-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .route-item {
+            padding: 1rem;
+            margin-bottom: 0.5rem;
+            background: #242835;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .route-item:hover { background: #2d3142; }
+        .route-item.active { border-left-color: var(--f1-red); background: #2d3142; }
+
+        .route-name-display { font-weight: 600; display: block; }
+        
+        /* Sector Strip */
+        .sector-strip {
+            padding: 1rem;
+            background: #000;
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            border-bottom: 1px solid #2d313d;
+        }
+
+        .sector-chip {
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            background: #1a1d26;
+            font-weight: 700;
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            white-space: nowrap;
+            border: 1px solid #333;
+        }
+
+        .sector-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* Segment Cards */
+        .segment-cards {
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .segment-card {
+            background: #242835;
+            border-radius: 8px;
+            padding: 1rem;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.2s;
+            border: 1px solid #2d313d;
+        }
+
+        .segment-card:hover { transform: translateX(5px); border-color: #444; }
+
+        .segment-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; bottom: 0;
+            width: 4px;
+        }
+
+        .s1::before { background: var(--sector-1); }
+        .s2::before { background: var(--sector-2); }
+        .s3::before { background: var(--sector-3); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-name { font-weight: 700; font-size: 1.1rem; }
+        .card-dist-start { font-size: 0.8rem; color: var(--text-dim); font-weight: 600; }
+
+        .card-stats {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { color: var(--text-dim); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-weight: 600; }
+
+        /* Footer / Import Bar */
+        footer {
+            grid-area: footer;
+            background: #000;
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            gap: 1rem;
+            border-top: 1px solid #2d313d;
+        }
+
+        .import-input {
+            flex: 1;
+            background: #111;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.6rem 1rem;
+            border-radius: 4px;
+        }
+
+        .btn {
+            background: var(--f1-red);
+            color: #fff;
+            border: none;
+            padding: 0.6rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover { background: #b00500; }
+
+        /* Editable Name */
+        .editable-name {
+            cursor: text;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .editable-name:hover { background: #333; }
+
+        /* Leaflet Overrides */
+        .leaflet-container { background: var(--bg-dark); }
+        
+        /* Animations */
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .active-sector { animation: pulse 2s infinite; }
+    </style>
+</head>
+<body>
+
+    <div class="layout">
+        <header>
+            <div class="brand">REDLINE<span>IQ</span></div>
+            <div class="auth-bar">
+                <span style="font-size: 0.8rem; color: var(--text-dim);">SYNC TOKEN</span>
+                <input type="text" id="tokenInput" class="token-input" placeholder="Paste your token here..." onchange="saveToken()">
+            </div>
+        </header>
+
+        <div id="map"></div>
+
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2 style="font-size: 1.2rem; margin: 0;">MY ROUTES</h2>
+                <button class="btn" style="padding: 0.3rem 0.7rem; font-size: 0.7rem;" onclick="loadRoutes()">Refresh</button>
+            </div>
+            
+            <div id="routeList" class="route-list">
+                <!-- Routes loaded here -->
+                <div style="padding: 2rem; text-align: center; color: var(--text-dim);">
+                    Enter token to load your routes
+                </div>
+            </div>
+
+            <div id="vizDetail" style="display: none; border-top: 2px solid var(--f1-red);">
+                <div class="sector-strip" id="sectorStrip">
+                    <!-- Sector chips here -->
+                </div>
+                <div class="segment-cards" id="segmentCards">
+                    <!-- Segment cards here -->
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <input type="text" id="rwgpsUrl" class="import-input" placeholder="Paste RideWithGPS Route URL (e.g. https://ridewithgps.com/routes/12345678)">
+            <button class="btn" onclick="importRoute()">Import Course</button>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        let map;
+        let activeRouteLayer;
+        let segmentLayers = [];
+        const sectorColors = ['var(--sector-1)', 'var(--sector-2)', 'var(--sector-3)'];
+
+        function initMap() {
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([40, -105], 10);
+
+            // Dark tiles
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+        }
+
+        function saveToken() {
+            const token = document.getElementById('tokenInput').value;
+            localStorage.setItem('redline_token', token);
+            loadRoutes();
+        }
+
+        function loadToken() {
+            const token = localStorage.getItem('redline_token');
+            if (token) {
+                document.getElementById('tokenInput').value = token;
+                loadRoutes();
+            }
+        }
+
+        async function apiFetch(path, options = {}) {
+            const token = document.getElementById('tokenInput').value;
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            const response = await fetch(path, { ...options, headers });
+            return await response.json();
+        }
+
+        async function loadRoutes() {
+            const data = await apiFetch('/api/routes');
+            if (data.status === 'success') {
+                const list = document.getElementById('routeList');
+                list.innerHTML = '';
+                data.routes.forEach(route => {
+                    const el = document.createElement('div');
+                    el.className = 'route-item';
+                    el.innerHTML = `
+                        <span class="route-name-display" id="name-${route.id}">${route.name}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-dim);">ID: ${route.id.split('-')[0]}...</span>
+                    `;
+                    el.onclick = () => selectRoute(route.id);
+                    list.appendChild(el);
+                });
+            }
+        }
+
+        async function importRoute() {
+            const url = document.getElementById('rwgpsUrl').value;
+            if (!url) return alert('Please paste a URL');
+            
+            const btn = document.querySelector('footer .btn');
+            const originalText = btn.innerText;
+            btn.innerText = 'IMPORTING...';
+            btn.disabled = true;
+
+            const data = await apiFetch('/api/routes/import', {
+                method: 'POST',
+                body: JSON.stringify({ url })
+            });
+
+            btn.innerText = originalText;
+            btn.disabled = false;
+
+            if (data.status === 'success') {
+                alert(`Successfully imported: ${data.name}`);
+                loadRoutes();
+                selectRoute(data.route_id);
+            } else {
+                alert(`Error: ${data.message}`);
+            }
+        }
+
+        async function selectRoute(id) {
+            // Update UI
+            document.querySelectorAll('.route-item').forEach(el => el.classList.remove('active'));
+            // Find the element and highlight it
+            const items = document.querySelectorAll('.route-item');
+            for(let item of items) {
+                if(item.innerHTML.includes(id.split('-')[0])) item.classList.add('active');
+            }
+
+            const data = await apiFetch(`/api/routes/${id}/viz`);
+            if (data.status === 'success') {
+                renderViz(data);
+            }
+        }
+
+        function renderViz(data) {
+            document.getElementById('vizDetail').style.display = 'block';
+            
+            // 1. Clear Map
+            if (activeRouteLayer) map.removeLayer(activeRouteLayer);
+            segmentLayers.forEach(l => map.removeLayer(l));
+            segmentLayers = [];
+
+            // 2. Full Polyline
+            activeRouteLayer = L.polyline(data.full_polyline, {
+                color: '#fff',
+                weight: 3,
+                opacity: 0.4
+            }).addTo(map);
+            map.fitBounds(activeRouteLayer.getBounds(), { padding: [50, 50] });
+
+            // 3. Sectors / Segments
+            const strip = document.getElementById('sectorStrip');
+            const cards = document.getElementById('segmentCards');
+            strip.innerHTML = '';
+            cards.innerHTML = '';
+
+            data.segments.forEach((seg, i) => {
+                const color = sectorColors[i % sectorColors.length];
+                
+                // Add to Map
+                const segLayer = L.polyline(seg.polyline, {
+                    color: color,
+                    weight: 6,
+                    opacity: 1
+                }).addTo(map);
+                segmentLayers.push(segLayer);
+
+                // Add to Sector Strip
+                const chip = document.createElement('div');
+                chip.className = 'sector-chip';
+                chip.innerHTML = `<div class="sector-dot" style="background: ${color}"></div> S${i+1} <span style="color: var(--text-dim)">${(seg.distance_m/1000).toFixed(1)}km</span>`;
+                strip.appendChild(chip);
+
+                // Add Card
+                const card = document.createElement('div');
+                card.className = `segment-card s${(i % 3) + 1}`;
+                card.innerHTML = `
+                    <div class="card-header">
+                        <div class="card-name">${seg.name}</div>
+                        <div class="card-dist-start">KM ${(seg.start_distance_m/1000).toFixed(1)}</div>
+                    </div>
+                    <div class="card-stats">
+                        <div class="stat-item">
+                            <span class="stat-label">Distance</span>
+                            <span class="stat-value">${(seg.distance_m/1000).toFixed(2)} km</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Elev Gain</span>
+                            <span class="stat-value">+${Math.round(seg.elevation_gain_m)} m</span>
+                        </div>
+                    </div>
+                `;
+                card.onmouseover = () => {
+                    segLayer.setStyle({ weight: 10 });
+                    segLayer.bringToFront();
+                };
+                card.onmouseout = () => {
+                    segLayer.setStyle({ weight: 6 });
+                };
+                cards.appendChild(card);
+            });
+
+            // Animated Trace
+            animatePolyline(activeRouteLayer, data.full_polyline);
+        }
+
+        function animatePolyline(layer, points) {
+            let i = 0;
+            const originalPoints = [...points];
+            layer.setLatLngs([]);
+            
+            function nextFrame() {
+                if (i < originalPoints.length) {
+                    const chunk = originalPoints.slice(0, i + 10);
+                    layer.setLatLngs(chunk);
+                    i += 10;
+                    requestAnimationFrame(nextFrame);
+                }
+            }
+            requestAnimationFrame(nextFrame);
+        }
+
+        initMap();
+        loadToken();
+    </script>
+</body>
+</html>

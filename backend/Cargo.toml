@@ -13,6 +13,8 @@ sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite"] }
 oauth2 = "4.4"
 reqwest = { version = "0.11", features = ["json"] }
 uuid = { version = "1.7", features = ["v4", "fast-rng"] }
+url = "2"
+quick-xml = { version = "0.31", features = ["serialize"] }
 
 [dev-dependencies]
 tokio-test = "0.4.3"

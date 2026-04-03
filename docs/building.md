@@ -1,50 +1,121 @@
-# Running & Testing the Custom Live Segments Project
+# Building & Running Redline IQ
 
-Here is how to test and deploy the system we have built, consisting of the Rust cloud backend and the Garmin Connect IQ app.
+A guide to building, simulating, and deploying the Garmin app and cloud backend.
 
-## 1. Running the Cloud Backend (Railway & Local)
+## Prerequisites
 
-### Local Testing
-The backend is a Rust Axum API with a static frontend portal. You can run it locally using Docker Compose:
+- **Docker** (used for both the Garmin SDK build toolchain and the backend)
+- A `docker volume` named `garmin-sdk-devices` (created automatically by `make setup-device`)
+
+---
+
+## 1. Cloud Backend
+
+### Run Locally
+
+The backend is a Rust Axum API + static web portal, containerized via Docker Compose:
+
 ```bash
-cd /home/nick/Documents/coding_projects/race_segments
-docker-compose up backend
+cd /path/to/race_segments
+docker compose up backend
 ```
-You can access the frontend portal at `http://localhost:8080` to upload a GPX file.
 
-### GHCR Auto-Deployment (GitHub Actions)
-We have configured a `.github/workflows/docker-publish.yml` pipeline.
-1. When you push to the `main` branch, GitHub Actions builds the Docker image and publishes it to the GitHub Container Registry (`ghcr.io/NikolaasBender/redline-iq-backend:latest`).
-2. To run the deployed image on any server:
-   ```bash
-   docker run -d -p 8080:8080 ghcr.io/NikolaasBender/redline-iq-backend:latest
-   ```
+- API + portal available at `http://localhost:8080`
+- SQLite database persisted in a named Docker volume (`backend-data`)
+- Set `RUST_LOG=debug` is already configured in `docker-compose.yml`
 
-## 2. Compiling the Garmin App
+### Environment Variables
 
-The Connect IQ app (`garmin_app/`) uses a community Docker image to compile the Monkey C code without needing to install the SDK locally.
-To build the `.prg` application file manually:
+Create a `.env` file in `backend/` for Google OAuth:
+
+```
+GOOGLE_CLIENT_ID=your_client_id
+GOOGLE_CLIENT_SECRET=your_client_secret
+REDIRECT_URL=http://localhost:8080/auth/google/callback
+DATABASE_URL=sqlite:data/race_segments.db?mode=rwc
+```
+
+### Deploy via GHCR (GitHub Actions)
+
+Pushing to `main` triggers `.github/workflows/docker-publish.yml`, which builds and publishes the image to GHCR:
+
 ```bash
-cd /home/nick/Documents/coding_projects/race_segments/garmin_app
-make keys   # Generates your developer key
-make build  # Uses Docker to compile the code
+docker pull ghcr.io/NikolaasBender/redline-iq-backend:latest
+docker run -d -p 8080:8080 \
+  -e GOOGLE_CLIENT_ID=... \
+  -e GOOGLE_CLIENT_SECRET=... \
+  -e REDIRECT_URL=https://your-domain/auth/google/callback \
+  -e DATABASE_URL=sqlite:data/race_segments.db?mode=rwc \
+  ghcr.io/NikolaasBender/redline-iq-backend:latest
 ```
-This will result in a `LiveSegments.prg` inside `garmin_app/bin/`.
 
-## 3. Testing with the Garmin Simulator
+---
 
-Since the Connect IQ Simulator requires a graphical interface, you should run it locally on your computer:
-1. Open Visual Studio Code and install the **Monkey C** extension by Garmin.
-2. Open the SDK Manager (`Ctrl+Shift+P` -> `Monkey C: Verify Installation`) to download the latest SDK.
-3. Open the `garmin_app/` folder in VS Code.
-4. Press `F5` or click "Run -> Start Debugging" to launch the visual simulator for the Edge 1040.
-5. Inside the simulator, you can click **Simulation -> Data Fields -> Timer** to start an activity, and **Simulation -> Fit Data -> Simulate Data** to simulate moving along a route!
+## 2. Garmin Data Field
 
-## 4. Sideloading to your Garmin Edge
+All Garmin build commands run via the `Makefile` inside `garmin_app/`. The SDK itself runs inside the `garmin-sdk-local` Docker image — no local SDK install required.
 
-When you are ready to test it on a real ride:
-1. Plug your Garmin Edge into your computer via USB.
-2. Wait for it to show up as an external drive (like a USB stick).
-3. Copy the `LiveSegments.prg` file from the `garmin_app/bin/` folder.
-4. Paste it into the `Garmin/Apps/` folder on your Edge device.
-5. Disconnect the device. When you go into an Activity Profile -> Data Screens -> Add Data Field, you will see "LiveSegments" under the Connect IQ Fields category!
+### First-Time Setup
+
+```bash
+cd garmin_app
+
+# Build the local SDK Docker image
+make setup
+
+# Download device/simulator profiles (opens the Garmin SDK Manager GUI)
+make setup-device
+```
+
+### Generate Developer Keys
+
+Only needed once. Creates `developer_key.pem` and `developer_key.der`:
+
+```bash
+make keys
+```
+
+### Build the App
+
+Compiles Monkey C source into `bin/LiveSegments.prg`:
+
+```bash
+make build
+```
+
+Target device is **Garmin Edge 840** (`edge840`). To change the target, edit the `DEVICE` variable at the top of `Makefile`.
+
+### Run in Simulator
+
+Launches the Connect IQ simulator (requires X11 display):
+
+```bash
+# Start the simulator in the background
+make simulate
+
+# Build + run the data field inside the simulator
+make run
+```
+
+Inside the simulator:
+- **Simulation → Data Fields → Timer** to start a fake activity
+- **Simulation → Fit Data → Simulate Data** to simulate GPS movement
+
+---
+
+## 3. Sideloading to a Real Device
+
+1. Build the app: `make build`
+2. Plug your Garmin Edge into your computer via USB
+3. Copy `garmin_app/bin/LiveSegments.prg` to `Garmin/Apps/` on the device
+4. Disconnect; navigate to **Activity Profile → Data Screens → Add Data Field → Connect IQ Fields** and select **LiveSegments**
+
+---
+
+## 4. Testing the Sync Flow
+
+1. Start the backend: `docker compose up backend`
+2. Open `http://localhost:8080` and sign in (or use the mock `/login` endpoint in development)
+3. Upload a GPX file with `[Segment Start]` / `[Segment End]` waypoints in the `<desc>` field
+4. Note the returned `route_id` and call `POST /api/routes/active` with it
+5. Run the app in the simulator — it will call `GET /api/segments` using the auth token and load your segment

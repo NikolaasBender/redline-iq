@@ -93,6 +93,27 @@ fn build_segment(
         .and_then(|tp| tp.e)
         .unwrap_or(0.0);
 
+    let mut points_all = Vec::new();
+    for tp in track_points.iter() {
+        let dist = tp.d.unwrap_or(0.0);
+        if dist >= start_d && dist <= end_d {
+            points_all.push(crate::gpx::TelemetryPoint {
+                distance: dist - start_d,
+                altitude: tp.e.unwrap_or(0.0),
+                // RWGPS doesn't always have time per point in this JSON, so use default 25km/h
+                elapsed_seconds: (dist - start_d) / 6.94,
+            });
+        }
+    }
+
+    let total_points = points_all.len();
+    let sample_rate = (total_points / 50).max(1);
+    let points_sampled = points_all.into_iter()
+        .enumerate()
+        .filter(|(idx, _)| idx % sample_rate == 0 || *idx == total_points - 1)
+        .map(|(_, p)| p)
+        .collect();
+
     Segment {
         name,
         start_lat,
@@ -104,6 +125,7 @@ fn build_segment(
         distance_m: end_d - start_d,
         elevation_gain_m: (end_ele - start_ele).max(0.0),
         polyline: segment_polyline,
+        points: points_sampled,
     }
 }
 

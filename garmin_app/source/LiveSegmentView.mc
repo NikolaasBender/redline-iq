@@ -33,12 +33,69 @@ class LiveSegmentView extends WatchUi.DataField {
 
         var app = Application.getApp() as LiveSegmentApp;
         var tracker = app.getSegmentTracker();
-        var segment = tracker.getActiveSegment();
+        var state = tracker.getState();
 
-        if (segment == null) {
-            drawNoSegment(dc);
-            return;
+        // Update detection logic
+        var info = Activity.getActivityInfo();
+        tracker.update(info);
+
+        if (state == :idle) {
+            drawIdle(dc, tracker);
+        } else if (state == :approaching) {
+            drawApproaching(dc, tracker);
+        } else if (state == :racing) {
+            drawRacing(dc, tracker);
+        } else if (state == :results) {
+            drawResults(dc, tracker);
         }
+
+        drawStatusIcons(dc);
+    }
+
+    private function drawIdle(dc as Dc, tracker as SegmentTracker) as Void {
+        var textColor = (getBackgroundColor() == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+        dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
+        
+        var midX = dc.getWidth() / 2;
+        var midY = dc.getHeight() / 2;
+        
+        dc.drawText(midX, midY - 20, Graphics.FONT_MEDIUM, "REDLINE IQ", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(midX, midY + 10, Graphics.FONT_XTINY, "No segments nearby", Graphics.TEXT_JUSTIFY_CENTER);
+        
+        var next = tracker.getNextSegment();
+        if (next != null) {
+            dc.drawText(midX, midY + 40, Graphics.FONT_XTINY, "Next: " + next.name, Graphics.TEXT_JUSTIFY_CENTER);
+        }
+    }
+
+    private function drawApproaching(dc as Dc, tracker as SegmentTracker) as Void {
+        var next = tracker.getNextSegment();
+        if (next == null) { return; }
+
+        var midX = dc.getWidth() / 2;
+        
+        // Header
+        dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(0, 0, dc.getWidth(), 30);
+        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(midX, 15, Graphics.FONT_XTINY, "APPROACHING: " + next.name, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+
+        // Simple preview chart (placeholder for ClimbPro style)
+        dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.setPenWidth(2);
+        dc.drawLine(20, 100, dc.getWidth() - 20, 100);
+        dc.drawLine(20, 100, 40, 80);
+        dc.drawLine(40, 80, 80, 90);
+        dc.drawLine(80, 90, 120, 60);
+
+        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(midX, 130, Graphics.FONT_SMALL, "DIST: " + (next.totalDistance/1000).format("%.1f") + "km", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(midX, 160, Graphics.FONT_XTINY, "ELEV: +" + next.targetTime + "m", Graphics.TEXT_JUSTIFY_CENTER); // Using targetTime as mock alt for now
+    }
+
+    private function drawRacing(dc as Dc, tracker as SegmentTracker) as Void {
+        var segment = tracker.getActiveSegment();
+        if (segment == null) { return; }
 
         var aheadBehind = tracker.getAheadBehind(mDistance, mElapsedSeconds);
         
@@ -47,15 +104,24 @@ class LiveSegmentView extends WatchUi.DataField {
         drawProgressBar(dc, segment, mDistance);
         drawElevationProfile(dc, segment, mDistance);
         drawBottomSection(dc, segment, mDistance, mSpeed);
-        
-        // Draw Status Icons (Sync/BT) in corners
-        drawStatusIcons(dc);
     }
 
-    private function drawNoSegment(dc as Dc) as Void {
+    private function drawResults(dc as Dc, tracker as SegmentTracker) as Void {
+        var segment = tracker.getActiveSegment();
+        if (segment == null) { return; }
+
         var textColor = (getBackgroundColor() == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
+        dc.setColor(Graphics.COLOR_GREEN, Graphics.COLOR_TRANSPARENT);
+        
+        var midX = dc.getWidth() / 2;
+        dc.drawText(midX, 40, Graphics.FONT_MEDIUM, "✓ STAGE COMPLETE", Graphics.TEXT_JUSTIFY_CENTER);
+        
         dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(dc.getWidth() / 2, dc.getHeight() / 2, Graphics.FONT_MEDIUM, "Waiting for Segment...", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        dc.drawText(midX, 80, Graphics.FONT_SMALL, segment.name, Graphics.TEXT_JUSTIFY_CENTER);
+        
+        // Final Stats
+        dc.drawText(midX, 140, Graphics.FONT_TINY, "TIME: 4:32", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(midX, 170, Graphics.FONT_TINY, "vs TARGET: -0:23", Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     private function drawTopBar(dc as Dc, segment as Segment) as Void {
@@ -63,7 +129,8 @@ class LiveSegmentView extends WatchUi.DataField {
         dc.fillRectangle(0, 0, dc.getWidth(), 30);
         
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(dc.getWidth() / 2, 15, Graphics.FONT_XTINY, segment.name, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        var label = segment.name;
+        dc.drawText(dc.getWidth() / 2, 15, Graphics.FONT_XTINY, label, Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function drawAheadBehind(dc as Dc, aheadBehind as Float) as Void {
@@ -87,23 +154,17 @@ class LiveSegmentView extends WatchUi.DataField {
         var x = 20;
         var h = 6;
 
-        // Background line
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(x, y, width, h);
 
         var progress = (currentDist / segment.totalDistance);
         if (progress > 1.0) { progress = 1.0; }
         
-        // Progress fill (YOU)
         dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(x, y, (width * progress).toNumber(), h);
-
-        // Marker for YOU (Triangle or Circle)
-        dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
         dc.fillCircle(x + (width * progress).toNumber(), y + h/2, 6);
 
-        // Marker for TARGET
-        // Find where the target is at the current elapsed time
+        // Target Marker
         var targetDist = 0.0f;
         var points = segment.points;
         for (var i = 1; i < points.size(); i++) {
@@ -114,9 +175,7 @@ class LiveSegmentView extends WatchUi.DataField {
                 targetDist = p1.distance + timeRatio * (p2.distance - p1.distance);
                 break;
             }
-            if (i == points.size() - 1) {
-                targetDist = points[i].distance;
-            }
+            if (i == points.size() - 1) { targetDist = points[i].distance; }
         }
         var targetProgress = targetDist / segment.totalDistance;
         if (targetProgress > 1.0) { targetProgress = 1.0; }
@@ -124,8 +183,6 @@ class LiveSegmentView extends WatchUi.DataField {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
         dc.setPenWidth(2);
         dc.drawCircle(x + (width * targetProgress).toNumber(), y + h/2, 6);
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(x + (width * targetProgress).toNumber(), y + h/2, Graphics.FONT_XTINY, "T", Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
     private function drawElevationProfile(dc as Dc, segment as Segment, currentDist as Float) as Void {
@@ -138,21 +195,14 @@ class LiveSegmentView extends WatchUi.DataField {
         if (points.size() < 2) { return; }
 
         dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
-        dc.setPenWidth(1);
-
-        // Simple line-based elevation profile
         for (var i = 1; i < points.size(); i++) {
             var x1 = xStart + (points[i-1].distance / segment.totalDistance * width).toNumber();
             var x2 = xStart + (points[i].distance / segment.totalDistance * width).toNumber();
-            
-            // Normalize altitude (very roughly for this mock)
             var y1 = yBase - ((points[i-1].altitude - 100) / 50 * hMax).toNumber();
             var y2 = yBase - ((points[i].altitude - 100) / 50 * hMax).toNumber();
-            
             dc.drawLine(x1, y1, x2, y2);
         }
 
-        // Current position indicator in elevation
         var currentX = xStart + (currentDist / segment.totalDistance * width).toNumber();
         dc.setColor(Graphics.COLOR_ORANGE, Graphics.COLOR_TRANSPARENT);
         dc.drawLine(currentX, yBase - hMax, currentX, yBase);
@@ -171,16 +221,13 @@ class LiveSegmentView extends WatchUi.DataField {
         var distStr = (distToGo / 1000.0).format("%.2f") + "km";
 
         var timeToGo = 0;
-        if (currentSpeed > 0.1) {
-            timeToGo = (distToGo / currentSpeed).toNumber();
-        }
+        if (currentSpeed > 0.1) { timeToGo = (distToGo / currentSpeed).toNumber(); }
         var tMinutes = timeToGo / 60;
         var tSeconds = timeToGo % 60;
         var timeStr = Lang.format("$1$:$2$", [tMinutes.format("%d"), tSeconds.format("%02d")]);
 
         var textColor = (getBackgroundColor() == Graphics.COLOR_BLACK) ? Graphics.COLOR_WHITE : Graphics.COLOR_BLACK;
         dc.setColor(textColor, Graphics.COLOR_TRANSPARENT);
-        
         dc.drawText(midX / 2, y + 5, Graphics.FONT_XTINY, "DIST TO GO", Graphics.TEXT_JUSTIFY_CENTER);
         dc.drawText(midX / 2, y + 20, Graphics.FONT_TINY, distStr, Graphics.TEXT_JUSTIFY_CENTER);
 
@@ -193,22 +240,14 @@ class LiveSegmentView extends WatchUi.DataField {
         var iconSize = 12;
         var width = dc.getWidth();
         var height = dc.getHeight();
-        
         var app = Application.getApp() as LiveSegmentApp;
-        
-        // Sync status icon in bottom-left
         drawSyncIcon(dc, padding, height - padding - iconSize, iconSize, app.getSyncStatus());
-
-        // Bluetooth icon in bottom-right
         drawBluetoothIcon(dc, width - padding - iconSize, height - padding - iconSize, iconSize, app.isPhoneConnected());
     }
 
     private function drawBluetoothIcon(dc as Dc, x as Number, y as Number, size as Number, connected as Boolean) as Void {
-        if (connected) {
-            dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT);
-        } else {
-            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
-        }
+        if (connected) { dc.setColor(Graphics.COLOR_BLUE, Graphics.COLOR_TRANSPARENT); }
+        else { dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT); }
         var half = size / 2;
         var quarter = size / 4;
         dc.setPenWidth(1);
@@ -224,7 +263,6 @@ class LiveSegmentView extends WatchUi.DataField {
         if (status == :syncing) { color = Graphics.COLOR_YELLOW; }
         else if (status == :success) { color = Graphics.COLOR_GREEN; }
         else if (status == :error) { color = Graphics.COLOR_RED; }
-        
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         var r = size / 4;
         var bottomY = y + size - r;

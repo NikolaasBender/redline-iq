@@ -24,15 +24,20 @@ sequenceDiagram
     W->>B: POST /api/routes/active { route_id }
     B-->>B: Link route to user profile
 
-    U->>G: 4. Start cycling activity
+    U->>W: 4. Download Course
+    W->>B: GET /api/routes/:id/course.gpx
+    B-->>U: Return course with [SEG] course points
+    U->>G: 5. Load GPX via USB/Garmin Connect
+
+    U->>G: 6. Start cycling activity (with Course)
     note over G,B: Garmin fetches via Bluetooth/Phone
     G->>B: GET /api/segments (Bearer token)
     B-->>G: Return compact segment JSON
 
     loop Every Second
-        G->>G: 5. Check GPS position vs segment start (50m radius)
-        G->>G: 6. Track ahead/behind vs target pace
-        G->>G: 7. Update progress bar, elevation profile, ETA
+        G->>G: 7. Check distanceToNextPoint vs [SEG] points
+        G->>G: 8. State Machine: IDLE ⭢ APPROACHING ⭢ RACING ⭢ RESULTS
+        G->>G: 9. Render ClimbPro-style vs Strava-style UI
     end
 ```
 
@@ -42,11 +47,11 @@ sequenceDiagram
 
 | File | Responsibility |
 |------|---------------|
-| `LiveSegmentApp.mc` | App entry point, holds state (sync status, mock phone connection, segment tracker) |
-| `LiveSegmentView.mc` | Renders the full segment screen: top bar, ahead/behind, progress bar, elevation, status icons |
-| `LiveSegmentDelegate.mc` | Handles touch/button input (e.g., toggle debug mock connection) |
-| `SegmentTracker.mc` | Haversine distance calc, segment start detection (50 m radius), ahead/behind interpolation |
-| `CloudSyncer.mc` | Makes authenticated HTTP GET to `/api/segments`, updates sync status symbol |
+| `LiveSegmentApp.mc` | App entry point, manages segment list and sync status |
+| `LiveSegmentView.mc` | State-based renderer: ClimbPro-style (approaching) and Strava-style (racing) |
+| `LiveSegmentDelegate.mc` | Handles touch/button input |
+| `SegmentTracker.mc` | 4-state machine, course-point detection, ahead/behind interpolation |
+| `CloudSyncer.mc` | Fetches and parses multiple segments from JSON |
 
 Build target: **Garmin Edge 840** (`edge840`). Built using a local Docker image (`garmin-sdk-local`) wrapping the Connect IQ SDK.
 
@@ -54,10 +59,11 @@ Build target: **Garmin Edge 840** (`edge840`). Built using a local Docker image 
 
 | File | Responsibility |
 |------|---------------|
-| `main.rs` | Axum router, middleware (request logging), API handlers |
-| `auth.rs` | Google OAuth flow (`/auth/google`, `/auth/google/callback`), placeholder `/signup` and `/login` |
-| `gpx.rs` | Parses GPX XML to extract annotated segment waypoints |
-| `db.rs` | SQLite init via SQLx (`users`, `routes` tables) |
+| `main.rs` | Axum router, API handlers (routes, segments, auto-sync) |
+| `course_export.rs` | Generates GPX courses with embedded [SEG] course points |
+| `auth.rs` | Google OAuth flow |
+| `gpx.rs` | Parses uploaded GPX files for segment discovery |
+| `db.rs` | SQLite schema management |
 
 The backend serves its own static web portal from the `public/` directory alongside the JSON API.
 

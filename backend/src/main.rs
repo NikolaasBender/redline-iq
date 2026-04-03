@@ -13,6 +13,7 @@ mod gpx;
 mod auth;
 mod db;
 mod ridewithgps;
+mod course_export;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -32,6 +33,7 @@ async fn main() {
         .route("/api/routes/import", post(import_rwgps_route))
         .route("/api/routes/:id/name", post(rename_route))
         .route("/api/routes/:id/viz", get(get_route_viz))
+        .route("/api/routes/:id/course.gpx", get(get_course_gpx))
         .route("/api/upload", post(upload_gpx))
         .merge(auth::auth_router())
         .layer(middleware::from_fn(logging_middleware))
@@ -71,7 +73,17 @@ async fn get_segments(
             .unwrap_or(None);
         
         if let Some(segments_json) = route_row {
-            let segments: serde_json::Value = serde_json::from_str(&segments_json).unwrap_or(serde_json::json!([]));
+            let mut segments: serde_json::Value = serde_json::from_str(&segments_json).unwrap_or(serde_json::json!([]));
+            
+            // Optimization: Strip polylines to save Garmin DataField memory (-1001 error)
+            if let Some(segs) = segments.as_array_mut() {
+                for s in segs {
+                    if let Some(obj) = s.as_object_mut() {
+                        obj.remove("polyline");
+                    }
+                }
+            }
+
             return Json(serde_json::json!({
                 "status": "success",
                 "route_id": route_id,
@@ -282,5 +294,42 @@ async fn get_route_viz(
         }))
     } else {
         Json(serde_json::json!({ "status": "error", "message": "Route not found" }))
+    }
+}
+
+async fn get_course_gpx(
+    axum::extract::State(state): axum::extract::State<AppState>,
+    axum::extract::Path(id): axum::extract::Path<String>,
+) -> impl axum::response::IntoResponse {
+    let route = sqlx::query("SELECT name, segments_json, full_polyline_json FROM routes WHERE id = ?")
+        .bind(&id)
+        .fetch_optional(&state.db)
+        .await
+        .unwrap_or(None);
+
+    if let Some(r) = route {
+        use sqlx::Row;
+        let name: String = r.get("name");
+        let segments_json: String = r.get("segments_json");
+        let polyline_json: String = r.get("full_polyline_json");
+
+        let segments: Vec<course_export::Segment> = serde_json::from_str(&segments_json).unwrap_or_default();
+        let polyline: Vec<[f64; 2]> = serde_json::from_str(&polyline_json).unwrap_or_default();
+
+        let gpx_content = course_export::generate_gpx_course(&name, &polyline, &segments);
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::HeaderValue::from_static("application/gpx+xml"),
+        );
+        headers.insert(
+            axum::http::header::CONTENT_DISPOSITION,
+            axum::http::header::HeaderValue::from_str(&format!("attachment; filename=\"{}.gpx\"", name.replace(' ', "_"))).unwrap(),
+        );
+
+        (headers, gpx_content).into_response()
+    } else {
+        axum::http::StatusCode::NOT_FOUND.into_response()
     }
 }

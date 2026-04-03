@@ -3,6 +3,14 @@ use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TelemetryPoint {
+    pub distance: f64,
+    pub altitude: f64,
+    pub elapsed_seconds: f64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Segment {
     pub name: String,
     pub start_lat: f64,
@@ -14,6 +22,8 @@ pub struct Segment {
     pub distance_m: f64,
     pub elevation_gain_m: f64,
     pub polyline: Vec<[f64; 2]>,
+    #[serde(default)]
+    pub points: Vec<TelemetryPoint>,
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +156,21 @@ pub fn parse_gpx(gpx_content: &str) -> (String, Vec<Segment>, Vec<[f64; 2]>) {
                     0.0
                 };
 
+                let mut points_sampled = Vec::new();
+                let total_points = segment_points.len();
+                let sample_rate = (total_points / 50).max(1); // Max 50 points per segment
+
+                for (idx, p) in segment_points.iter().enumerate() {
+                    if idx % sample_rate == 0 || idx == total_points - 1 {
+                        points_sampled.push(TelemetryPoint {
+                            distance: p.dist - s_dist,
+                            altitude: p.ele,
+                            // If no time is in GPX, mock it at 25km/h (6.94 m/s)
+                            elapsed_seconds: (p.dist - s_dist) / 6.94,
+                        });
+                    }
+                }
+
                 segments.push(Segment {
                     name,
                     start_lat: s_lat,
@@ -157,6 +182,7 @@ pub fn parse_gpx(gpx_content: &str) -> (String, Vec<Segment>, Vec<[f64; 2]>) {
                     distance_m: dist - s_dist,
                     elevation_gain_m: ele_gain,
                     polyline,
+                    points: points_sampled,
                 });
             }
         }

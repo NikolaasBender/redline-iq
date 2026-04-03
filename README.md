@@ -16,22 +16,20 @@ Welcome to **Redline IQ**, the ultimate tool for cyclists who want total control
 ## 🛠️ Features
 
 ### Garmin Data Field
-- **Strava-style segment screen** — large ahead/behind timer (green/red), segment name bar, progress bar, and elevation profile
-- **Dual marker progress bar** — orange dot tracks *your* position, white circle tracks the *target* pace in real time
-- **Elevation profile** — mini chart showing the segment's terrain with a position indicator
-- **Connection status icons** — bottom-left sync indicator (idle/syncing/success/error) and bottom-right Bluetooth icon
-- **"Waiting for Segment..." idle state** — shows a clean splash when no segment is active
+- **ClimbPro-style State Machine** — transitions through IDLE, APPROACHING, RACING, and RESULTS states automatically
+- **Strava-style Segment Screen** — large ahead/behind timer (green/red), segment name bar, progress bar, and elevation profile
+- **Native Course Integration** — uses `distanceToNextPoint` for surgical segment triggering via embedded course points
+- **Dual-Marker Progress Bar** — orange dot tracks *your* position, white circle tracks the *target* pace in real time
+- **Connection Status Icons** — bottom-left sync indicator and bottom-right Bluetooth icon
 
 ### Cloud Backend (Rust / Axum)
-- **RideWithGPS Import** — Paste a route URL (e.g., `https://ridewithgps.com/routes/53786083`) to automatically ingest the route and segments.
-- **GPX Parsing** — Extracts segments from your route file using standard XML parsing.
+- **One-Button Course Export** — Download a `.gpx` file for your Garmin with route navigation and segment course points pre-embedded.
+- **RideWithGPS Import** — Paste a route URL (e.g., `https://ridewithgps.com/routes/53786083`) to ingest telemetry automatically.
 - **Segment Detection Logic**:
-    - **Text-based**: Looks for `[Segment Start]` and `[Segment End]` in waypoint names or course point names.
+    - **Text-based**: Looks for `[Segment Start]` and `[Segment End]` in waypoints.
     - **POI-based**: Automatically recognizes RideWithGPS "Points of Interest" with type `segment_start` or `segment_end`.
-- **SQLite Persistence** — Stores routes and segments per user using a lightweight embedded database.
-- **Google OAuth Sign-in** — Authenticate with your Google account to get a sync token.
-- **My Routes Portal** — Manage your imported routes. View all routes in your library and set the **Active Route** to broadcast to your device.
-- **Static Web Portal** — Served alongside the API for managing your library and sync token.
+- **Google OAuth Sign-in** — Authenticate to manage your library and get a sync token.
+- **Premium Web Portal** — Dark-mode map visualizer with segment telemetry and course management.
 
 ## 🚀 Get Started
 

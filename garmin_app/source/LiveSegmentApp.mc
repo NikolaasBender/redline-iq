@@ -8,6 +8,7 @@ class LiveSegmentApp extends Application.AppBase {
     private var mMockPhoneConnected as Boolean = System.getDeviceSettings().phoneConnected;
     private var mCloudSyncer as CloudSyncer = new CloudSyncer();
     private var mSegmentTracker as SegmentTracker = new SegmentTracker();
+    private var mSegments as Array<Segment> = [] as Array<Segment>;
 
     function initialize() {
         AppBase.initialize();
@@ -29,6 +30,12 @@ class LiveSegmentApp extends Application.AppBase {
         return mSegmentTracker;
     }
 
+    function setSegments(segments as Array<Segment>) as Void {
+        mSegments = segments;
+        mSegmentTracker.setSegments(segments);
+        WatchUi.requestUpdate();
+    }
+
     private function setupMockSegment(startDist as Float) as Void {
         var points = [
             new SegmentPoint(0.0, 100.0, 0.0),
@@ -38,7 +45,8 @@ class LiveSegmentApp extends Application.AppBase {
             new SegmentPoint(2000.0, 140.0, 280.0)
         ];
         var segment = new Segment("Old La Honda", 2000.0, 280, points);
-        mSegmentTracker.setActiveSegment(segment, startDist);
+        setSegments([segment]);
+        mSegmentTracker.setStartDistance(startDist);
     }
 
     function isPhoneConnected() as Boolean {

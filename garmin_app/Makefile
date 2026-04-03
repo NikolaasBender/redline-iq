@@ -33,6 +33,7 @@ simulate:
 	docker run -d --rm --net host \
 		-e DISPLAY \
 		-v /tmp/.X11-unix:/tmp/.X11-unix \
+		-v $(PWD):/app \
 		-v garmin-sdk-devices:/home/developer/.Garmin \
 		$(SDK_IMAGE) simulator
 

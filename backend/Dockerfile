@@ -1,4 +1,5 @@
 FROM rust:latest as builder
+RUN apt-get update && apt-get install -y pkg-config libssl-dev libsqlite3-dev
 WORKDIR /usr/src/app
 COPY . .
 RUN cargo build --release
